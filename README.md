@@ -16,6 +16,9 @@ HTML5 Canvas: For rendering the game’s 2D graphics and animations.
 JavaScript: For game logic, physics, and user interactions.
 CSS: For basic styling of the game interface.
 Font Awesome: For optional UI icons (e.g., pause/play buttons).
+<img width="909" height="630" alt="image" src="https://github.com/user-attachments/assets/f3dedb03-eb2a-415a-a442-5f3c0d79ae19" />
+<img width="976" height="570" alt="image" src="https://github.com/user-attachments/assets/0432a5cb-63c3-40b1-9f8f-e2080f7547e7" />
+
 
 Installation
 To run the Hurdle Runner Game locally, follow these steps:
