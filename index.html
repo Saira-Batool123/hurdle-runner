@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hurdle Runner Adventure</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden; /* Hide scrollbars */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: 'Comic Sans MS', Arial, sans-serif;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            
+            /* --- FULL PAGE BACKGROUND (SKY AND GROUND) --- */
+            background: linear-gradient(to bottom, #87CEEB 0%, #87CEEB 70%, #4CAF50 70%, #4CAF50 100%);
+            /* Blue sky (0-70%) and Green ground (70-100%) */
+        }
+
+        #gameContainer {
+            position: relative;
+            text-align: center;
+            background-color: transparent; 
+            width: 800px; /* Fixed width for the game canvas */
+            height: 600px; /* Fixed height for the game canvas */
+        }
+
+        #startScreen, #gameOverScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7); /* Dark overlay for screens */
+            color: #FFD700; /* Gold text */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100; /* Ensure these screens are on top */
+            animation: fadeIn 0.6s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        h1 {
+            font-size: 4em;
+            margin-bottom: 30px;
+            text-shadow: 6px 6px 10px rgba(0, 0, 0, 0.7);
+        }
+        p {
+            font-size: 2em;
+            margin: 15px 0;
+        }
+        #startScreen button, #gameOverScreen button {
+            margin: 15px; 
+            padding: 18px 36px;
+            font-size: 28px;
+            border: none;
+            border-radius: 15px;
+            background: #4CAF50; /* Green button */
+            color: white;
+            cursor: pointer;
+            transition: transform 0.3s ease, background 0.3s ease;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+        }
+        #startScreen button:hover, #gameOverScreen button:hover {
+            background: #388E3C; /* Darker green on hover */
+            transform: scale(1.1);
+        }
+        #startScreen button:disabled {
+            background: #6c757d; /* Grey out disabled button */
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+        #gameOverScreen {
+            display: none;
+        }
+        #gameCanvas {
+            background-color: transparent; 
+            display: block; 
+            outline: none; 
+            position: relative; 
+            z-index: 1; 
+        }
+        #scoreDisplay {
+            position: absolute;
+            top: 30px;
+            left: 30px;
+            color: #FFD700;
+            font-size: 38px;
+            text-shadow: 6px 6px 9px #000;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px 25px;
+            border-radius: 15px;
+            border: 4px solid #FFD700;
+            z-index: 5; 
+            min-width: 160px;
+            text-align: center;
+        }
+        #debugInfo {
+            display: none; 
+        }
+        #instructionsMessage {
+            position: absolute;
+            bottom: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 0, 0.98); 
+            color: #333;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 1.3em;
+            font-weight: bold;
+            display: none; 
+            z-index: 90;
+            white-space: nowrap;
+            transition: opacity 0.6s ease-out; 
+            opacity: 1;
+        }
+        /* Style for the name input field */
+        #nameInputContainer {
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #nameInputContainer label {
+            font-size: 1.8em;
+            color: #FFF;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 5px rgba(0,0,0,0.7);
+        }
+        #playerNameInput {
+            padding: 10px 20px;
+            font-size: 1.5em;
+            border: 2px solid #FFD700;
+            border-radius: 8px;
+            background-color: rgba(255, 255, 255, 0.9);
+            color: #333;
+            text-align: center;
+            width: 250px;
+            max-width: 80%;
+        }
+        #playerNameInput::placeholder {
+            color: #aaa;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        
+        <div id="startScreen">
+            <h1>Hurdle Runner</h1>
+            <div id="nameInputContainer">
+                <label for="playerNameInput">Enter Your Name:</label>
+                <input type="text" id="playerNameInput" placeholder="Player Name" maxlength="15">
+            </div>
+            <button id="playGameBtn" onclick="handlePlayGame()" disabled>Play</button> </div>
+        <div id="gameOverScreen">
+            <h1>Game Over</h1>
+            <p id="finalScoreDisplay"></p>
+            <p id="playerStatsDisplay"></p>
+            <button onclick="restartGame()">Again</button>
+        </div>
+        
+        <div id="scoreDisplay">Score: 0</div>
+        <div id="instructionsMessage">Use Arrow Keys (Left, Right, Up) to move and jump!</div>
+        <div id="debugInfo"></div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const startScreen = document.getElementById('startScreen');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const finalScoreDisplay = document.getElementById('finalScoreDisplay');
+        const playerStatsDisplay = document.getElementById('playerStatsDisplay');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const instructionsMessage = document.getElementById('instructionsMessage');
+        const playerNameInput = document.getElementById('playerNameInput'); // Reference to the input field
+        const playGameBtn = document.getElementById('playGameBtn'); // Reference to the Play button
+
+        let playerName = 'Guest'; // Default player name
+        let score = 0;
+        let gameRunning = false;
+        let animationFrameId = null;
+        let kidColor = '#4CAF50';
+        let legAnimation = 0;
+        let armAnimation = 0;
+        let frameCount = 0;
+
+        const playerImage = new Image();
+        playerImage.src = 'boy.png'; 
+        playerImage.onerror = () => {
+            console.warn("Player image 'boy.png' not found. Drawing a stick figure instead.");
+        };
+
+        const GROUND_Y = canvas.height * 0.70; 
+
+        const kid = {
+            x: 100,
+            y: GROUND_Y - 60, 
+            width: 30,
+            height: 60,
+            speed: 6,
+            velocityY: 0,
+            jumpForce: -13,
+            gravity: 0.5,
+            isGrounded: true
+        };
+
+        const hurdles = [];
+        const HURDLE_WIDTH = 45;
+        const HURDLE_HEIGHT = 50;
+        const HURDLE_SPEED = 5; 
+        const HURDLE_SPAWN_INTERVAL_MIN = 60;  
+        const HURDLE_SPAWN_INTERVAL_MAX = 100; 
+        let nextHurdleSpawn = 0;
+
+        const keys = {
+            ArrowLeft: false,
+            ArrowRight: false,
+            ArrowUp: false
+        };
+
+        function drawBackground() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height); 
+        }
+
+        function drawKid() {
+            if (playerImage.complete && playerImage.naturalWidth > 0) {
+                ctx.drawImage(playerImage, kid.x, kid.y, kid.width + 10, kid.height + 10); 
+            } else {
+                ctx.save();
+                ctx.translate(kid.x, kid.y);
+
+                ctx.fillStyle = '#FFE4C4';
+                ctx.beginPath();
+                ctx.arc(kid.width / 2, 12, 10, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#000000';
+                ctx.beginPath();
+                ctx.arc(kid.width / 2 - 4, 10, 2, 0, Math.PI * 2);
+                ctx.arc(kid.width / 2 + 4, 10, 2, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.strokeStyle = '#FF0000';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(kid.width / 2, 15, 4, 0, Math.PI);
+                ctx.stroke();
+
+                ctx.fillStyle = '#3C2F2F';
+                ctx.beginPath();
+                ctx.moveTo(kid.width / 2 - 12, 5);
+                ctx.lineTo(kid.width / 2, 0);
+                ctx.lineTo(kid.width / 2 + 12, 5);
+                ctx.fill();
+
+                ctx.fillStyle = kidColor;
+                ctx.fillRect(5, 22, kid.width - 10, 25);
+
+                ctx.fillStyle = '#FFE4C4';
+                if (kid.velocityY !== 0 || keys.ArrowLeft || keys.ArrowRight) {
+                    armAnimation = (armAnimation + 0.3) % (Math.PI * 2);
+                    ctx.save();
+                    ctx.translate(0, 22);
+                    ctx.rotate(Math.sin(armAnimation) * 0.2);
+                    ctx.fillRect(0, 0, 5, 20);
+                    ctx.restore();
+
+                    ctx.save();
+                    ctx.translate(kid.width - 5, 22);
+                    ctx.rotate(-Math.sin(armAnimation) * 0.2);
+                    ctx.fillRect(0, 0, 5, 20);
+                    ctx.restore();
+                } else {
+                    ctx.fillRect(0, 22, 5, 20);
+                    ctx.fillRect(kid.width - 5, 22, 5, 20);
+                }
+
+                ctx.fillStyle = '#355E3B';
+                if (kid.velocityY !== 0 || keys.ArrowLeft || keys.ArrowRight) {
+                    legAnimation = (legAnimation + 0.3) % (Math.PI * 2);
+                    ctx.save();
+                    ctx.translate(5, 47);
+                    ctx.rotate(Math.sin(legAnimation) * 0.3);
+                    ctx.fillRect(0, 0, 10, 13);
+                    ctx.restore();
+
+                    ctx.save();
+                    ctx.translate(kid.width - 15, 47);
+                    ctx.rotate(-Math.sin(legAnimation) * 0.3);
+                    ctx.fillRect(0, 0, 10, 13);
+                    ctx.restore();
+                } else {
+                    ctx.fillRect(5, 47, 10, 13);
+                    ctx.fillRect(kid.width - 15, 47, 10, 13);
+                }
+                ctx.restore();
+            }
+        }
+
+        function drawHurdle(hurdle) {
+            ctx.save();
+            ctx.translate(hurdle.x, hurdle.y);
+            ctx.fillStyle = '#8B4513'; 
+            ctx.fillRect(0, 0, hurdle.width, hurdle.height);
+            ctx.fillStyle = '#A0522D'; 
+            ctx.fillRect(5, 5, hurdle.width - 10, hurdle.height - 10);
+            ctx.strokeStyle = '#3C2F2F'; 
+            ctx.lineWidth = 2;
+            ctx.strokeRect(0, 0, hurdle.width, hurdle.height);
+            ctx.fillStyle = '#654321'; 
+            ctx.fillRect(0, hurdle.height / 3, hurdle.width, 5);
+            ctx.fillRect(0, 2 * hurdle.height / 3, hurdle.width, 5);
+            ctx.restore();
+        }
+
+        function updateGame() {
+            if (!gameRunning) {
+                if (animationFrameId) {
+                    cancelAnimationFrame(animationFrameId);
+                    animationFrameId = null;
+                }
+                return;
+            }
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (keys.ArrowLeft) {
+                kid.x -= kid.speed;
+                if (kid.x < 0) kid.x = 0;
+            }
+            if (keys.ArrowRight) {
+                kid.x += kid.speed;
+                if (kid.x + kid.width > canvas.width) kid.x = canvas.width - kid.width;
+            }
+            if (keys.ArrowUp && kid.isGrounded) {
+                kid.velocityY = kid.jumpForce;
+                kid.isGrounded = false;
+                keys.ArrowUp = false; 
+            }
+
+            kid.velocityY += kid.gravity;
+            kid.y += kid.velocityY;
+
+            if (kid.y >= GROUND_Y - kid.height) {
+                kid.y = GROUND_Y - kid.height;
+                kid.velocityY = 0;
+                kid.isGrounded = true;
+            }
+
+            drawKid();
+
+            if (frameCount >= nextHurdleSpawn) {
+                const newHurdle = {
+                    x: canvas.width,
+                    y: GROUND_Y - HURDLE_HEIGHT, 
+                    width: HURDLE_WIDTH,
+                    height: HURDLE_HEIGHT,
+                    passed: false
+                };
+                hurdles.push(newHurdle);
+                nextHurdleSpawn = frameCount + Math.floor(Math.random() * (HURDLE_SPAWN_INTERVAL_MAX - HURDLE_SPAWN_INTERVAL_MIN + 1)) + HURDLE_SPAWN_INTERVAL_MIN;
+            }
+
+            for (let i = 0; i < hurdles.length; i++) {
+                const hurdle = hurdles[i];
+                hurdle.x -= HURDLE_SPEED;
+                drawHurdle(hurdle);
+
+                if (
+                    kid.x < hurdle.x + hurdle.width &&
+                    kid.x + kid.width > hurdle.x &&
+                    kid.y < hurdle.y + hurdle.height &&
+                    kid.y + kid.height > hurdle.y
+                ) {
+                    kidColor = 'red'; 
+                    setTimeout(() => {
+                        endGame();
+                    }, 200); 
+                    return; 
+                }
+
+                if (!hurdle.passed && kid.x > hurdle.x + hurdle.width) {
+                    hurdle.passed = true;
+                    score += 10;
+                }
+
+                if (hurdle.x + hurdle.width < 0) {
+                    hurdles.splice(i, 1);
+                    i--; 
+                }
+            }
+
+            scoreDisplay.textContent = `Score: ${Math.floor(score)}`;
+            frameCount++;
+            animationFrameId = requestAnimationFrame(updateGame);
+        }
+
+        // Function to handle game start after name input
+        function handlePlayGame() {
+            let inputName = playerNameInput.value.trim();
+
+            if (inputName === "") {
+                alert("Please enter your name to play!");
+                playerNameInput.focus(); // Focus back on the input field
+                return;
+            } else {
+                playerName = inputName;
+            }
+            
+            startScreen.style.display = 'none';
+            gameOverScreen.style.display = 'none';
+
+            instructionsMessage.style.display = 'block';
+            instructionsMessage.style.opacity = '1';
+            setTimeout(() => {
+                instructionsMessage.style.opacity = '0';
+                setTimeout(() => {
+                    instructionsMessage.style.display = 'none';
+                    instructionsMessage.style.opacity = '1';
+                }, 600);
+            }, 2000);
+
+            score = 0;
+            frameCount = 0;
+            hurdles.length = 0; 
+
+            kid.x = 100;
+            kid.y = GROUND_Y - kid.height;
+            kid.velocityY = 0;
+            kid.isGrounded = true;
+            kidColor = '#4CAF50'; 
+
+            scoreDisplay.textContent = `Score: ${score}`;
+
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+
+            nextHurdleSpawn = frameCount + Math.floor(Math.random() * (HURDLE_SPAWN_INTERVAL_MAX - HURDLE_SPAWN_INTERVAL_MIN + 1)) + HURDLE_SPAWN_INTERVAL_MIN;
+
+            gameRunning = true;
+            canvas.focus();
+            updateGame(); 
+            console.log('Game started, canvas focused:', document.activeElement === canvas);
+        }
+
+        function endGame() {
+            gameRunning = false;
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+            gameOverScreen.style.display = 'flex';
+            finalScoreDisplay.textContent = `Score: ${Math.floor(score)}`;
+            playerStatsDisplay.textContent = `Player: ${playerName}`; 
+        }
+
+        function restartGame() {
+            gameOverScreen.style.display = 'none';
+            startScreen.style.display = 'flex'; // Show start screen again
+            playerNameInput.value = ''; // Clear the input field
+            playerName = 'Guest'; // Reset player name for new game
+            playGameBtn.disabled = true; // Disable play button until name is entered again
+        }
+
+        // Event listener for input field to enable/disable Play button
+        playerNameInput.addEventListener('input', () => {
+            playGameBtn.disabled = playerNameInput.value.trim() === '';
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (gameRunning && instructionsMessage.style.display === 'none') {
+                if (e.code in keys) {
+                    keys[e.code] = true;
+                    e.preventDefault(); 
+                }
+            }
+        }, { passive: false });
+
+        document.addEventListener('keyup', (e) => {
+            if (gameRunning && instructionsMessage.style.display === 'none') {
+                if (e.code in keys) {
+                    keys[e.code] = false;
+                }
+            }
+        });
+
+        canvas.setAttribute('tabindex', '0'); 
+
+        canvas.addEventListener('click', () => {
+            if (gameRunning) {
+                canvas.focus();
+                console.log('Canvas clicked, focus gained');
+            }
+        });
+
+        let imagesLoaded = 0;
+        const totalImagesToLoad = 1; 
+
+        function imageLoadHandler() {
+            imagesLoaded++;
+            if (imagesLoaded === totalImagesToLoad) {
+                console.log("All game images loaded!");
+            }
+        }
+
+        playerImage.onload = imageLoadHandler;
+
+        if (playerImage.complete) imageLoadHandler();
+
+        // Initial alert only when the window loads for the first time
+        window.onload = () => {
+            alert('Welcome to Hurdle Runner!\n\nEnter your name in the field, then click "Play" to begin your adventure!');
+            playerNameInput.focus(); // Automatically focus on the input field on load
+        };
+    </script>
+</body>
+</html>
